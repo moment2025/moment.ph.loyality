@@ -12,7 +12,7 @@ from telegram.ext import (
 
 # ================ Налаштування ===================
 # Вставте свій токен бота нижче
-BOT_TOKEN = 7983993765:AAGu-NrdifmWMi_HlMVIZMvkwS8tpiJxXVU
+BOT_TOKEN = "7983993765:AAGu-NrdifmWMi_HlMVIZMvkwS8tpiJxXVU"
 
 # Введіть ID адміністраторів через кому, наприклад:
 ADMINS = {569585062}
