@@ -15,7 +15,7 @@ from telegram.ext import (
 BOT_TOKEN = "7983993765:AAGu-NrdifmWMi_HlMVIZMvkwS8tpiJxXVU"
 
 # Введіть ID адміністраторів через кому, наприклад:
-ADMINS = {569585062}
+ADMINS = {569585062,797671005} 
 # ================================================
 
 # Налаштування логування
@@ -24,7 +24,7 @@ logging.basicConfig(
 )
 
 # Глобальні змінні для зберігання даних
-# Словник співробітників: ключ – ID користувача, значення – кількість бонусів
+# Словник співробітників: ключ – ID користувача, значення – dict з "bonus" та "username"
 employees = {}  
 # Використовуємо список адміністраторів з налаштувань
 admins = ADMINS
@@ -50,7 +50,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     # Якщо користувач є співробітником, показуємо меню бонусів
     elif user_id in employees:
-        bonus = employees.get(user_id, 0)
+        bonus = employees[user_id]["bonus"]
         text = f"Привіт, хочешь подивитись бонуси?\nУ тебе {bonus} бонусів."
         keyboard = [[InlineKeyboardButton("Мої бонуси", callback_data="show_bonus")]]
         reply_markup = InlineKeyboardMarkup(keyboard)
@@ -68,14 +68,14 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     # Обробка кнопок для співробітників
     if data == "show_bonus":
-        bonus = employees.get(user_id, 0)
+        bonus = employees.get(user_id, {}).get("bonus", 0)
         text = f"Твої бонуси: {bonus}\nНатисни 'Назад' щоб повернутись."
         keyboard = [[InlineKeyboardButton("Назад", callback_data="back_employee")]]
         reply_markup = InlineKeyboardMarkup(keyboard)
         await query.edit_message_text(text=text, reply_markup=reply_markup)
 
     elif data == "back_employee":
-        bonus = employees.get(user_id, 0)
+        bonus = employees.get(user_id, {}).get("bonus", 0)
         text = f"Привіт, хочешь подивитись бонуси?\nУ тебе {bonus} бонусів."
         keyboard = [[InlineKeyboardButton("Мої бонуси", callback_data="show_bonus")]]
         reply_markup = InlineKeyboardMarkup(keyboard)
@@ -89,9 +89,11 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             return ADMIN_MAIN
         text = "Виберіть співробітника для нарахування бонусів:"
         keyboard = []
-        # Створюємо кнопку для кожного співробітника (ID)
+        # Створюємо кнопку для кожного співробітника (ID та нікнейм)
         for emp_id in employees.keys():
-            keyboard.append([InlineKeyboardButton(str(emp_id), callback_data=f"award_{emp_id}")])
+            username = employees[emp_id]["username"]
+            button_text = f"{emp_id} - {username}"
+            keyboard.append([InlineKeyboardButton(button_text, callback_data=f"award_{emp_id}")])
         keyboard.append([InlineKeyboardButton("Назад", callback_data="admin_back")])
         reply_markup = InlineKeyboardMarkup(keyboard)
         await query.edit_message_text(text=text, reply_markup=reply_markup)
@@ -155,7 +157,7 @@ async def admin_award_enter(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return ADMIN_MAIN
 
     # Оновлюємо кількість бонусів для співробітника
-    employees[selected_employee] = bonus_amount
+    employees[selected_employee]["bonus"] = bonus_amount
 
     # Спробуємо повідомити співробітника (якщо бот може відправити повідомлення)
     try:
@@ -185,8 +187,16 @@ async def admin_add_employee(update: Update, context: ContextTypes.DEFAULT_TYPE)
     if new_emp_id in employees:
         await update.message.reply_text("Співробітник з цим ID вже існує.")
     else:
-        employees[new_emp_id] = 0
-        await update.message.reply_text("Новий працівник додан!")
+        # Спробуємо отримати інформацію про користувача
+        try:
+            chat = await context.bot.get_chat(new_emp_id)
+            # Якщо username відсутній, використовуємо first_name
+            username = chat.username if chat.username else chat.first_name
+        except Exception as e:
+            logging.error(f"Не вдалося отримати інформацію для {new_emp_id}: {e}")
+            username = "Unknown"
+        employees[new_emp_id] = {"bonus": 0, "username": username}
+        await update.message.reply_text(f"Новий працівник додан! {new_emp_id} - {username}")
     return ADMIN_MAIN
 
 
